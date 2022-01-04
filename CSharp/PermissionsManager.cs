@@ -1,14 +1,15 @@
-/*
-  "Permissions Manager"
-    Used For adding and removing security permisions from files and directories.
+/*********************************************************************************************************
+ * "Permissions Manager"
+ *   Used For adding and removing security permisions from files and directories.
+ *
+ * Inspired by the code here:
+ *   https://docs.microsoft.com/en-us/dotnet/api/system.io.directory.setaccesscontrol?view=netframework-4.8
+ *
+ * Credits:
+ *   Microsoft, Medstar
+*********************************************************************************************************/
 
-  Inspired by the code here:
-    https://docs.microsoft.com/en-us/dotnet/api/system.io.directory.setaccesscontrol?view=netframework-4.8
-
-  Credits:
-    Microsoft, Medstar
-*/
-
+using System;
 using System.IO;
 using System.Security.Principal;
 using System.Security.AccessControl;
@@ -17,79 +18,120 @@ namespace Medstar.CodeSnippets
 {
     public static class PermissionsManager
     {
+        #region From DllImport
+        [System.Runtime.InteropServices.DllImport("advapi32.dll", SetLastError = true)]
+        private static extern bool ConvertStringSidToSid(string StringSid, out IntPtr ptrSid);
+        #endregion
+
+        #region SID Definitions (You need to modify both of these in order to add more SIDs for use)
         public enum SID
         {
-            AllApplicationPackages,
-            CurrentUser
+            AllApplicationPackages
         }
 
-        private static string CheckSID(SID SecurityIdentifier)
+        private static string Enum2SID(SID eSID)
         {
-            switch (SecurityIdentifier)
+            switch (eSID)
             {
                 case SID.AllApplicationPackages:
-                    return @"ALL APPLICATION PACKAGES";
+                    return "S-1-15-2-1";
 
-                case SID.CurrentUser:
-                    return WindowsIdentity.GetCurrent().Name;
                 default:
-                    return "";
+                    return "S-1-0-0";
             }
         }
+        #endregion
 
-        // Adds an ACL entry on the specified directory for a specified account
+        #region Private Functions
+        private static bool GetSID(SID eSID, out SecurityIdentifier oSID)
+        {
+            oSID = ConvertStringSidToSid(Enum2SID(eSID), out IntPtr pSID) ? new SecurityIdentifier(pSID) : null;
+            return oSID != null;
+        }
+        #endregion
+
+        #region Public Functions
         public static void AddDirectorySecurity(string DirPath, SID Account, FileSystemRights Rights, AccessControlType ControlType)
         {
-            DirectoryInfo dInfo = new DirectoryInfo(DirPath);
-            DirectorySecurity dSecurity = dInfo.GetAccessControl();
-            
-            if (CheckSID(Account) != "")
+            /**********************************************************************
+             * Adds an ACL entry on the specified directory for a specified account
+             *********************************************************************/
+
+            // Check if given account is valid and if given directory exists
+            if (GetSID(Account, out SecurityIdentifier SID) && Directory.Exists(DirPath))
             {
+                // Get directory info
+                DirectoryInfo dInfo = new DirectoryInfo(DirPath);
+                DirectorySecurity dSecurity = dInfo.GetAccessControl();
+
+                // Set up flags
                 InheritanceFlags iFlags = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
                 PropagationFlags pFlags = PropagationFlags.None;
-                dSecurity.AddAccessRule(new FileSystemAccessRule(CheckSID(Account), Rights, iFlags, pFlags, ControlType));
+
+                // Set desired permissions
+                dSecurity.AddAccessRule(new FileSystemAccessRule(SID, Rights, iFlags, pFlags, ControlType));
                 dInfo.SetAccessControl(dSecurity);
             }
         }
 
-        // Removes an ACL entry on the specified directory for a specified account
         public static void RemoveDirectorySecurity(string DirPath, SID Account, FileSystemRights Rights, AccessControlType ControlType)
         {
-            DirectoryInfo dInfo = new DirectoryInfo(DirPath);
-            DirectorySecurity dSecurity = dInfo.GetAccessControl();
-            
-            if (CheckSID(Account) != "")
+            /*************************************************************************
+             * Removes an ACL entry on the specified directory for a specified account
+             ************************************************************************/
+
+            // Check if given account is valid and if given directory exists
+            if (GetSID(Account, out SecurityIdentifier SID) && Directory.Exists(DirPath))
             {
+                // Get directory info
+                DirectoryInfo dInfo = new DirectoryInfo(DirPath);
+                DirectorySecurity dSecurity = dInfo.GetAccessControl();
+
+                // Set up flags
                 InheritanceFlags iFlags = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
                 PropagationFlags pFlags = PropagationFlags.None;
-                dSecurity.RemoveAccessRuleAll(new FileSystemAccessRule(CheckSID(Account), Rights, iFlags, pFlags, ControlType));
+
+                // Remove desired permissions
+                dSecurity.RemoveAccessRuleAll(new FileSystemAccessRule(SID, Rights, iFlags, pFlags, ControlType));
                 dInfo.SetAccessControl(dSecurity);
             }
         }
 
-        // Adds an ACL entry on the specified file for a specified account
         public static void AddFileSecurity(string FilePath, SID Account, FileSystemRights Rights, AccessControlType ControlType)
         {
-            FileInfo fInfo = new FileInfo(FilePath);
-            FileSecurity fSecurity = fInfo.GetAccessControl();
+            /*****************************************************************
+             * Adds an ACL entry on the specified file for a specified account
+             ****************************************************************/
 
-            if (CheckSID(Account) != "")
+            if (GetSID(Account, out SecurityIdentifier SID) && File.Exists(FilePath))
             {
-                fSecurity.AddAccessRule(new FileSystemAccessRule(CheckSID(Account), Rights, ControlType));
+                // Get file info
+                FileInfo fInfo = new FileInfo(FilePath);
+                FileSecurity fSecurity = fInfo.GetAccessControl();
+
+                // Add desired permissions
+                fSecurity.AddAccessRule(new FileSystemAccessRule(SID, Rights, ControlType));
                 fInfo.SetAccessControl(fSecurity);
             }
         }
 
-        // Removes an ACL entry on the specified file for a specified account
         public static void RemoveFileSecurity(string FilePath, SID Account, FileSystemRights Rights, AccessControlType ControlType)
         {
-            FileInfo fInfo = new FileInfo(FilePath);
-            FileSecurity fSecurity = fInfo.GetAccessControl();
-            if (CheckSID(Account) != "")
+            /********************************************************************
+             * Removes an ACL entry on the specified file for a specified account
+             *******************************************************************/
+
+            if (GetSID(Account, out SecurityIdentifier SID) && File.Exists(FilePath))
             {
-                fSecurity.RemoveAccessRuleAll(new FileSystemAccessRule(CheckSID(Account), Rights, ControlType));
+                // Get file info
+                FileInfo fInfo = new FileInfo(FilePath);
+                FileSecurity fSecurity = fInfo.GetAccessControl();
+
+                // Remove desired permissions
+                fSecurity.RemoveAccessRuleAll(new FileSystemAccessRule(SID, Rights, ControlType));
                 fInfo.SetAccessControl(fSecurity);
             }
         }
+        #endregion
     }
 }
