@@ -33,6 +33,10 @@ namespace Medstar.CodeSnippets
             }
         }
 
+        #region Custom Functions
+        public long SeekBack(long offset) => BaseStream.Seek(BaseStream.Position - offset, SeekOrigin.Begin);
+        #endregion
+
         #region Overrides
         // Signed
         public override short ReadInt16() => BitConverter.ToInt16(ReadWithEndianness(sizeof(short)), 0);

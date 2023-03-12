@@ -31,6 +31,10 @@ namespace Medstar.CodeSnippets
             }
         }
 
+        #region Custom Functions
+        public long SeekBack(long offset) => BaseStream.Seek(offset, SeekOrigin.Current);
+        #endregion
+
         #region Overrides
         // Signed
         public override void Write(short  value) => WriteWithEndianness(BitConverter.GetBytes(value));
